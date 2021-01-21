@@ -17,6 +17,8 @@ def get_AppleCurrentKeyboardLayoutInputSourceID():
                 print("当前是【ABC】输入法！%s" %current_time)
             elif AppleCurrentKeyboardLayoutInputSourceID == "com.apple.keylayout.PinyinKeyboard":
                 print("当前是【拼音】输入法！%s" %current_time)
+            else:
+                print("当前是未知的输入法！%s" %current_time)
         time.sleep(5)
 
 if __name__ == "__main__":
