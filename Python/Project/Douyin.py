@@ -43,13 +43,14 @@ def save_json(json_data, filename, last_modified):
 ''' 下载视频文件 '''
 
 
-def download_file(url, filename, last_modified):
+def download_file(url, path, last_modified):
     try:
         with closing(s.get(url)) as response:
             chunk_size = 30240
             content_size = int(response.headers["content-length"])
             data_count = 0
-            with open(os.path.join(video_dir_path, filename), "wb") as file:
+            filename = os.path.basename(path)
+            with open(path, "wb") as file:
                 for data in response.iter_content(chunk_size=chunk_size):
                     file.write(data)
                     data_count = data_count + len(data)
@@ -57,8 +58,7 @@ def download_file(url, filename, last_modified):
                     print("\r 【%s】文件下载进度：%d%%(%d/%d)" %
                           (filename, now_jd, data_count, content_size),
                           end="")
-            os.utime(os.path.join(video_dir_path, filename),
-                     (last_modified, last_modified))
+            os.utime(path, (last_modified, last_modified))
             if content_size < 200:
                 download_file(url, filename, last_modified)
                 print("重新下载")
@@ -96,10 +96,10 @@ def get_videolist(user_id, sec_uid, max_cursor, isEnd):
                         "&line=0&ratio=720p&watermark=1&media_type=4&vr_type=0&improve_bitrate=0&logo_name=aweme_self"
                     )
                     video_name = "user_" + user_id + "_" + video_id
-                    if (os.path.isfile(
-                            os.path.join(video_dir_path, video_name + ".mp4"))
-                            is False):
-                        download_file(video_uri, video_name + ".mp4",
+                    video_save_path = os.path.join(video_dir_path,
+                                                   video_name + ".mp4")
+                    if (os.path.isfile(video_save_path) is False):
+                        download_file(video_uri, video_save_path,
                                       last_modified)
                         save_json(item, video_name, last_modified)
                     else:
