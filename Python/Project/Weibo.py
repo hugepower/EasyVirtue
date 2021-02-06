@@ -2,7 +2,7 @@
 Author: hugepower
 Date: 2021-02-05 09:22:43
 LastEditors: hugepower
-LastEditTime: 2021-02-06 12:40:48
+LastEditTime: 2021-02-06 13:21:20
 Description: 微博下载
 '''
 import os
@@ -17,14 +17,12 @@ from urllib.parse import urlparse
 class MyWeibo(object):
     def __init__(self, weibo_usernick, weibo_uid, page, weibo_path):
         self.weibo_usernick = weibo_usernick
-        self.weibo_uid = weibo_uid
+        self.weibo_uid = weibo_uid 
         self.page = page
         self.weibo_path = weibo_path
         self.weibo_user_dirpath = os.path.join(
             weibo_path, "{},{}".format(weibo_usernick, weibo_uid))
-        self.weibo_user_path = os.path.join(weibo_path,
-                                            self.weibo_user_dirpath)
-        self.weibo_dict_path = os.path.join(self.weibo_user_path, "Weibo_Dict")
+        self.weibo_dict_path = os.path.join(self.weibo_user_dirpath, "Weibo_Dict")
 
     s = requests.Session()
     s.headers = {
@@ -179,7 +177,8 @@ if __name__ == "__main__":
     print(data)
     data_dict = data.to_dict("records")
 
-    for item in data_dict[0:3]:
+    for item in data_dict[0:1]:
         weibo = MyWeibo(item["微博昵称"], item["微博uid"], 1, weibo_save_path)
         print("\n{}\n".format(weibo.weibo_user_dirpath))
+        print("\n{}\n".format(weibo.weibo_dict_path))
         weibo.weibo_run()
