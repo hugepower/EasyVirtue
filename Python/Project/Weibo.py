@@ -2,7 +2,7 @@
 Author: hugepower
 Date: 2021-02-05 09:22:43
 LastEditors: hugepower
-LastEditTime: 2021-02-06 12:00:47
+LastEditTime: 2021-02-06 12:40:48
 Description: 微博下载
 '''
 import os
@@ -85,7 +85,7 @@ class MyWeibo(object):
                 #weibo_text = weibo_mblog.get('data').get('text')
                 #weibo_source = weibo_mblog.get('data').get('source')
                 time_array = time.strptime(weibo_created_at,
-                                        "%a %b %d %H:%M:%S +0800 %Y")
+                                           "%a %b %d %H:%M:%S +0800 %Y")
                 time_stamp = int(time.mktime(time_array))  # 毫秒
                 last_modified = time.strftime('%Y%m%d%H%M%S', time_array)
 
@@ -100,7 +100,7 @@ class MyWeibo(object):
                         'ts_ld'
                     ]
                     quality_best = sorted(weibo_video_urls,
-                                        key=quality_rule.index)[0]
+                                          key=quality_rule.index)[0]
                     quality_best_url = weibo_video_urls[quality_best]
                     parsed = urlparse(quality_best_url)
                     video_name = os.path.basename(parsed.path)
@@ -109,7 +109,7 @@ class MyWeibo(object):
                         "{}_{}".format(last_modified, video_name))
                     #print("微博视频:{}".format(video_name))
                     self.download_file(quality_best_url, video_filepath,
-                                    time_stamp)
+                                       time_stamp)
 
                 weibo_pics = weibo_mblog.get('data').get('pics')
                 if weibo_pics is not None:
@@ -119,7 +119,7 @@ class MyWeibo(object):
                         pic_filepath = os.path.join(
                             self.weibo_user_dirpath,
                             "{}_{}".format(last_modified,
-                                        os.path.basename(pic_url)))
+                                           os.path.basename(pic_url)))
                         self.download_file(pic_url, pic_filepath, time_stamp)
                         #print("普通照片:{}".format(pic_name))
 
@@ -133,15 +133,16 @@ class MyWeibo(object):
                         pic_video_format_name = "{}_{}.mov".format(
                             last_modified, v)
                         pic_video_path = os.path.join(self.weibo_user_dirpath,
-                                                    pic_video_format_name)
+                                                      pic_video_format_name)
                         self.download_file(pic_video_url, pic_video_path,
-                                        time_stamp)
+                                           time_stamp)
                         #print("实况照片:{}".format(pic_video_format_name))
 
-                mblog_dict_name = "{}_{}.json".format(last_modified,
-                                                    weibo_mblog.get('data').get('mid'))
+                mblog_dict_name = "{}_{}.json".format(
+                    last_modified,
+                    weibo_mblog.get('data').get('mid'))
                 mblog_dict_path = os.path.join(self.weibo_dict_path,
-                                            mblog_dict_name)
+                                               mblog_dict_name)
                 with open(mblog_dict_path, "w+") as f:
                     f.write(
                         json.dumps(weibo_mblog, indent=4, ensure_ascii=False))
@@ -157,8 +158,8 @@ class MyWeibo(object):
             self.weibo_download(page + 1)
         else:
             print(weibo_dict)
-            print("「{},{}」爬取完毕!\n\n".format(self.weibo_usernick, self.weibo_uid))
-        
+            print("「{},{}」爬取完毕!\n\n".format(self.weibo_usernick,
+                                            self.weibo_uid))
 
     def weibo_run(self):
         if os.path.isdir(self.weibo_dict_path) is False:
@@ -169,7 +170,8 @@ class MyWeibo(object):
 if __name__ == "__main__":
     weibo_userlist_path = os.environ[
         'HOME'] + "/Desktop/EasyVirtue/weibo_userlist.txt"
-    weibo_save_path = os.path.join(os.environ['HOME'], "www.weibo.com")
+    weibo_save_path = os.path.join(os.environ['HOME'], "Downloads",
+                                   "www.weibo.com")
     data = pd.read_table(weibo_userlist_path,
                          header=None,
                          names=["微博昵称", "微博uid"],
@@ -177,7 +179,7 @@ if __name__ == "__main__":
     print(data)
     data_dict = data.to_dict("records")
 
-    for item in data_dict[0:2]:
+    for item in data_dict[0:3]:
         weibo = MyWeibo(item["微博昵称"], item["微博uid"], 1, weibo_save_path)
         print("\n{}\n".format(weibo.weibo_user_dirpath))
         weibo.weibo_run()
