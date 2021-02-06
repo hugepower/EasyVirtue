@@ -2,8 +2,8 @@
 Author: hugepower
 Date: 2021-02-05 09:22:43
 LastEditors: hugepower
-LastEditTime: 2021-02-06 11:21:08
-Description: file content
+LastEditTime: 2021-02-06 12:00:47
+Description: 微博下载
 '''
 import os
 import pandas as pd
@@ -37,11 +37,7 @@ class MyWeibo(object):
         if r.status_code == 200:
             try:
                 weibo_dict = json.loads(r.text)
-                if weibo_dict.get('ok') == 1:
-                    return weibo_dict
-                else:
-                    print(weibo_dict)
-                    print("{},{}爬取完毕!".format(self.usernick, self.uid))
+                return weibo_dict
             except:
                 pass
         elif r.status_code == 418:
@@ -78,7 +74,7 @@ class MyWeibo(object):
             print("Error message: %s" % ex)
 
     def weibo_parse(self, weibo_dict):
-        weibo_cards = weibo_dict.get('data').get('cards')
+        weibo_cards = weibo_dict.get('cards')
         for card in weibo_cards:
             weibo_mid = card.get('mblog').get('mid')
             weibo_mid_url = "https://m.weibo.cn/statuses/show?id={}".format(
@@ -86,18 +82,16 @@ class MyWeibo(object):
             weibo_mblog = self.weibo_response(weibo_mid_url)
             if weibo_mblog is not None:
                 weibo_created_at = weibo_mblog.get('data').get('created_at')
-                weibo_text = weibo_mblog.get('data').get('text')
-                weibo_source = weibo_mblog.get('data').get('source')
-                weibo = weibo_mblog.get('data').get('pic_video')
+                #weibo_text = weibo_mblog.get('data').get('text')
+                #weibo_source = weibo_mblog.get('data').get('source')
                 time_array = time.strptime(weibo_created_at,
-                                           "%a %b %d %H:%M:%S +0800 %Y")
+                                        "%a %b %d %H:%M:%S +0800 %Y")
                 time_stamp = int(time.mktime(time_array))  # 毫秒
                 last_modified = time.strftime('%Y%m%d%H%M%S', time_array)
 
                 weibo_video_urls = weibo_mblog.get('data').get(
                     "page_info", {}).get("urls")
                 if weibo_video_urls is not None:
-                    # 感谢 TG中文交流群 @he19260817 提供的方法
                     quality_rule = [
                         'mp4_1080p_mp4', 'mp4_720p_mp4', 'mp4_720p',
                         'hevc_mp4_hd', 'mp4_hd_mp4', 'mp4_hd', 'inch_4_mp4_hd',
@@ -106,7 +100,7 @@ class MyWeibo(object):
                         'ts_ld'
                     ]
                     quality_best = sorted(weibo_video_urls,
-                                          key=quality_rule.index)[0]
+                                        key=quality_rule.index)[0]
                     quality_best_url = weibo_video_urls[quality_best]
                     parsed = urlparse(quality_best_url)
                     video_name = os.path.basename(parsed.path)
@@ -115,7 +109,7 @@ class MyWeibo(object):
                         "{}_{}".format(last_modified, video_name))
                     #print("微博视频:{}".format(video_name))
                     self.download_file(quality_best_url, video_filepath,
-                                       time_stamp)
+                                    time_stamp)
 
                 weibo_pics = weibo_mblog.get('data').get('pics')
                 if weibo_pics is not None:
@@ -125,7 +119,7 @@ class MyWeibo(object):
                         pic_filepath = os.path.join(
                             self.weibo_user_dirpath,
                             "{}_{}".format(last_modified,
-                                           os.path.basename(pic_url)))
+                                        os.path.basename(pic_url)))
                         self.download_file(pic_url, pic_filepath, time_stamp)
                         #print("普通照片:{}".format(pic_name))
 
@@ -139,15 +133,15 @@ class MyWeibo(object):
                         pic_video_format_name = "{}_{}.mov".format(
                             last_modified, v)
                         pic_video_path = os.path.join(self.weibo_user_dirpath,
-                                                      pic_video_format_name)
+                                                    pic_video_format_name)
                         self.download_file(pic_video_url, pic_video_path,
-                                           time_stamp)
+                                        time_stamp)
                         #print("实况照片:{}".format(pic_video_format_name))
 
                 mblog_dict_name = "{}_{}.json".format(last_modified,
-                                                      weibo_mblog.get('mid'))
+                                                    weibo_mblog.get('data').get('mid'))
                 mblog_dict_path = os.path.join(self.weibo_dict_path,
-                                               mblog_dict_name)
+                                            mblog_dict_name)
                 with open(mblog_dict_path, "w+") as f:
                     f.write(
                         json.dumps(weibo_mblog, indent=4, ensure_ascii=False))
@@ -156,9 +150,15 @@ class MyWeibo(object):
     def weibo_download(self, page):
         url = "https://m.weibo.cn/api/container/getIndex?containerid=107603{}&page={}".format(
             self.weibo_uid, page)
+        print(url)
         weibo_dict = self.weibo_response(url)
-        self.weibo_parse(weibo_dict)
-        self.weibo_download(page + 1)
+        if weibo_dict.get('ok') == 1:
+            self.weibo_parse(weibo_dict.get('data'))
+            self.weibo_download(page + 1)
+        else:
+            print(weibo_dict)
+            print("「{},{}」爬取完毕!\n\n".format(self.weibo_usernick, self.weibo_uid))
+        
 
     def weibo_run(self):
         if os.path.isdir(self.weibo_dict_path) is False:
@@ -177,6 +177,7 @@ if __name__ == "__main__":
     print(data)
     data_dict = data.to_dict("records")
 
-    for item in data_dict[0:1]:
+    for item in data_dict[0:2]:
         weibo = MyWeibo(item["微博昵称"], item["微博uid"], 1, weibo_save_path)
+        print("\n{}\n".format(weibo.weibo_user_dirpath))
         weibo.weibo_run()
