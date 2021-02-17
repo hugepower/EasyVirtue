@@ -2,7 +2,7 @@
 Author: hugepower
 Date: 2021-02-14 16:24:05
 LastEditors: hugepower
-LastEditTime: 2021-02-17 20:59:59
+LastEditTime: 2021-02-17 23:22:11
 Description: 抖音视频下载
 '''
 
@@ -98,7 +98,7 @@ class MyDouyin(object):
             vide_name = "user_{}_{}".format(user_id, video_id)
             video_save_path = os.path.join(self.user_videosDir_path,
                                            vide_name + ".mp4")
-            if os.path.isfile(path) is False:
+            if os.path.isfile(video_save_path) is False:
                 self.download_video(video_url, video_save_path, last_modified)
                 self.download_aweme_dict(aweme_dict, vide_name, last_modified)
             else:
@@ -114,7 +114,7 @@ class MyDouyin(object):
             os.makedirs(self.user_dictDir_path)
         if os.path.isdir(self.user_videosDir_path) is False:
             os.makedirs(self.user_videosDir_path)
-        self.download_douyin(self.max_cursor, update_download=False)
+        self.download_douyin(self.max_cursor, update_download=True)
 
 
 def read_userlist(path):
