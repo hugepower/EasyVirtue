@@ -1,155 +1,137 @@
+'''
+Author: hugepower
+Date: 2021-02-14 16:24:05
+LastEditors: hugepower
+LastEditTime: 2021-02-17 20:36:55
+Description: 抖音视频下载
+'''
+
 import os
 import requests
-import time
 import json
-import re
 from contextlib import closing
 import pandas as pd
 
-json_dir_path = os.environ["HOME"] + "/Movies/www.douyin.com/Json_Data"
-video_dir_path = os.environ["HOME"] + "/Movies/www.douyin.com/Videos"
 
-s = requests.Session()
-s.headers = {
-    "User-Agent":
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
-}
-''' 读取用户列表 '''
+class MyDouyin(object):
+    def __init__(self, nickname, user_id, sec_uid, max_cursor):
+        self.nickname = nickname
+        self.user_id = user_id
+        self.sec_uid = sec_uid
+        self.max_cursor = max_cursor
+        self.douyin_home_path = os.path.join(os.environ["HOME"],
+                                             "Movies/www.douyin.com")
+        self.user_home_path = os.path.join(self.douyin_home_path,
+                                             "{},{}".format(nickname, user_id))
+        self.user_dictDir_path = os.path.join(self.user_home_path,
+                                                "douyin_dict")
+        self.user_videosDir_path = os.path.join(self.user_home_path,
+                                                 "videos")
+
+    s = requests.Session()
+    s.headers = {
+        "User-Agent":
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
+    }
+
+    def download_video(self, url, path, last_modified):
+        filename = os.path.basename(path)
+        temp_path = path + ".part"
+        try:
+            with closing(self.s.get(url, stream=True)) as response:
+                chunk_size = 30240
+                content_size = int(response.headers['content-length'])
+                data_count = 0
+                with open(temp_path, "wb") as file:
+                    for data in response.iter_content(
+                            chunk_size=chunk_size):
+                        file.write(data)
+
+                        data_count = data_count + len(data)
+                        now_jd = (data_count / content_size) * 100
+                        print("\r 【%s】下载进度：%d%%(%d/%d)" %
+                                (filename, now_jd, data_count, content_size),
+                                end="")
+                if int(os.path.getsize(temp_path)) == content_size:
+                    os.rename(temp_path, path)
+                os.utime(path, (last_modified, last_modified))
+                print('\n【%s】Download completed!' % filename)
+        except Exception as ex:
+            print("Error message: %s" % ex)
+
+    def download_aweme_dict(self, aweme_dict, file_name, last_modified):
+        path = os.path.join(self.user_dictDir_path,
+                                       file_name + ".json")
+        if os.path.isfile(path) is False:
+            with open(path, "w+") as f:
+                f.write(json.dumps(aweme_dict, indent=4, ensure_ascii=False))
+            os.utime(path, (last_modified, last_modified))
+
+    def get_video_url(self,video_id):
+        return "https://aweme-hl.snssdk.com/aweme/v1/play/?video_id={}&line=0&ratio=720p&watermark=1&media_type=4&vr_type=0&improve_bitrate=0&logo_name=aweme_self".format(video_id)
+
+    def get_last_modified(self,aweme_dict,max_cursor):
+        if "_" in aweme_dict.get("video").get("origin_cover").get("uri"):
+            last_modified = int(aweme_dict.get("video").get("origin_cover").get("uri").split("_")[1])
+        else:
+            last_modified = max_cursor / 1000
+        return last_modified
+
+    def get_video_id(self,aweme_dict):
+        return aweme_dict.get("video").get("vid")
+        
+    def get_user_id(self,aweme_dict):
+        return aweme_dict.get("author").get("uid")
+        
+    def download_douyin(self, max_cursor,isEnd=False,update_download=False):
+        url = "https://www.iesdouyin.com/web/api/v2/aweme/post/?sec_uid={}&count=21&max_cursor={}&aid=1128&_signature=-0hNCQAAm22IvkdmgWfgI.tITR".format(
+            self.sec_uid, max_cursor)
+        print(url)
+        douyin_dict = json.loads(self.s.get(url).text)
+        next_max_cursor = douyin_dict.get("max_cursor")
+        aweme_list_dict = douyin_dict.get("aweme_list")
+        for aweme_dict in aweme_list_dict:
+            video_id = self.get_video_id(aweme_dict)
+            user_id = self.get_user_id(aweme_dict)
+            last_modified = self.get_last_modified(aweme_dict,next_max_cursor)
+            video_url = self.get_video_url(video_id)
+            vide_name = "user_{}_{}".format(user_id, video_id)
+            video_save_path = os.path.join(self.user_videosDir_path, vide_name + ".mp4")
+            if os.path.isfile(path) is False:
+                self.download_video(video_url,video_save_path,last_modified)
+                self.download_aweme_dict(aweme_dict, vide_name, last_modified)
+            else:
+                isEnd = update_download
+                print("「{}」已经存在!".format(vide_name))
+        if douyin_dict.get("has_more") is True and isEnd is False:
+            self.download_douyin(next_max_cursor)
+        else:
+            print("已经没有更多的视频可以下载了。")
+
+    def douyin_run(self):
+        if os.path.isdir(self.user_dictDir_path) is False:
+            os.makedirs(self.user_dictDir_path)
+        if os.path.isdir(self.user_videosDir_path) is False:
+            os.makedirs(self.user_videosDir_path)
+        self.download_douyin(self.max_cursor,update_download=True)
 
 
-def read_userlist(path):
+if __name__ == "__main__":
+    path = os.path.join(os.environ["HOME"],
+                        "Desktop/EasyVirtue/douyin_userlist.txt")
     data = pd.read_table(path,
                          header=None,
-                         names=["user_id", "sec_uid"],
+                         names=["nickname", "user_id", "sec_uid"],
                          sep=",")
     # dropping null value columns to avoid errors
     data.dropna(inplace=True)
     print(data)
     data_dict = data.to_dict("records")
-    return data_dict
 
-
-''' 保存视频信息 '''
-
-
-def save_json(json_data, filename, last_modified):
-
-    json_file_path = os.path.join(json_dir_path, filename + ".json")
-    with open(json_file_path, "w+") as f:
-        f.write(json.dumps(json_data, indent=4, ensure_ascii=False))
-    os.utime(json_file_path, (last_modified, last_modified))
-
-
-''' 下载视频文件 '''
-
-
-def download_file(url, path, last_modified):
-    try:
-        with closing(s.get(url)) as response:
-            chunk_size = 30240
-            content_size = int(response.headers["content-length"])
-            data_count = 0
-            filename = os.path.basename(path)
-            with open(path, "wb") as file:
-                for data in response.iter_content(chunk_size=chunk_size):
-                    file.write(data)
-                    data_count = data_count + len(data)
-                    now_jd = (data_count / content_size) * 100
-                    print("\r 【%s】文件下载进度：%d%%(%d/%d)" %
-                          (filename, now_jd, data_count, content_size),
-                          end="")
-            os.utime(path, (last_modified, last_modified))
-            if content_size < 200:
-                download_file(url, filename, last_modified)
-                print("重新下载")
-
-        print("\n")
-    except Exception as ex:
-        print("错误的消息: %s" % ex)
-
-
-''' 获取视频列表 '''
-
-
-def get_videolist(user_id, sec_uid, max_cursor, isEnd):
-    json_url = (
-        "https://www.iesdouyin.com/web/api/v2/aweme/post/?sec_uid=%s&count=21&max_cursor=%s&aid=1128&_signature=&"
-        % (sec_uid, max_cursor))
-    print(user_id, sec_uid, max_cursor)
-    while isEnd:
-        json_data = json.loads(s.get(json_url).text)
-        if json_data["has_more"] is True:
-            print(json_url)
-            for item in json_data["aweme_list"]:
-                try:
-                    video_id = item["video"]["play_addr"]["uri"]
-                    max_cursor = json_data['max_cursor']
-                    user_id = item["author"]["uid"]
-                    if "_" in item["video"]["origin_cover"]["uri"]:
-                        last_modified = int(
-                            item["video"]["origin_cover"]["uri"].split("_")[1])
-                    else:
-                        last_modified = max_cursor / 1000
-                    video_uri = (
-                        "https://aweme-hl.snssdk.com/aweme/v1/play/?video_id="
-                        + video_id +
-                        "&line=0&ratio=720p&watermark=1&media_type=4&vr_type=0&improve_bitrate=0&logo_name=aweme_self"
-                    )
-                    video_name = "user_" + user_id + "_" + video_id
-                    video_save_path = os.path.join(video_dir_path,
-                                                   video_name + ".mp4")
-                    if (os.path.isfile(video_save_path) is False):
-                        download_file(video_uri, video_save_path,
-                                      last_modified)
-                        save_json(item, video_name, last_modified)
-                    else:
-                        print("「%s」文件已存在！" % video_name)
-                        isEnd = False
-                except Exception as ex:
-                    print(ex, last_modified, video_uri,
-                          item["video"]["origin_cover"])
-            # break
-            get_videolist(user_id, sec_uid, max_cursor, isEnd)
-
-
-''' 扩展短链接 '''
-
-
-def revertShortLink(url):
-    res = s.head(url)
-    newUrl = res.headers.get('location')
-    if newUrl is None:
-        return url
-    else:
-        return newUrl
-
-
-''' 提取链接信息 '''
-
-
-def get_url_info(url):
-    url = revertShortLink(url)
-    sec_uid_search = re.compile(r"sec_uid=(.*?)&")
-    sec_uid = re.search(sec_uid_search, url).group(1)
-    print(sec_uid)
-
-    user_id_search = re.compile(r"user/(.*?)\?")
-    user_id = re.search(user_id_search, url).group(1)
-    print(user_id)
-
-
-''' 程序主方法 '''
-
-
-def douyin_main(path):
-    userlist_dict = read_userlist(path)
-    for item in reversed(userlist_dict[0:]):
-        user_id = item["user_id"]
-        sec_uid = item["sec_uid"]
-        get_videolist(user_id, sec_uid, 0, True)
-
-
-if __name__ == "__main__":
-    path = os.environ[
-        "HOME"] + "/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/douyin_userlist.txt"
-    douyin_main(path)
+    for item in data_dict:
+        nickname = item.get("nickname")
+        user_id = item.get("user_id")
+        sec_uid = item.get("sec_uid")
+        print("\n\n正在下载用户【{},{}】的所有视频\n\n".format(nickname, user_id))
+        douyin = MyDouyin(nickname, user_id, sec_uid, 0)
+        douyin.douyin_run()
