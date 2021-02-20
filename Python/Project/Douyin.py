@@ -2,15 +2,17 @@
 Author: hugepower
 Date: 2021-02-14 16:24:05
 LastEditors: hugepower
-LastEditTime: 2021-02-17 23:22:11
+LastEditTime: 2021-02-21 00:48:29
 Description: 抖音视频下载
 '''
 
-import os
-import requests
 import json
+import os
 from contextlib import closing
+from urllib.parse import urlencode
+
 import pandas as pd
+import requests
 
 
 class MyDouyin(object):
@@ -30,7 +32,7 @@ class MyDouyin(object):
     s = requests.Session()
     s.headers = {
         "User-Agent":
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
     }
 
     def download_video(self, url, path, last_modified):
@@ -56,6 +58,7 @@ class MyDouyin(object):
                 print('\n【%s】Download completed!' % filename)
         except Exception as ex:
             print("Error message: %s" % ex)
+            self.download_video(url, path, last_modified)
 
     def download_aweme_dict(self, aweme_dict, file_name, last_modified):
         path = os.path.join(self.user_dictDir_path, file_name + ".json")
@@ -64,15 +67,38 @@ class MyDouyin(object):
                 f.write(json.dumps(aweme_dict, indent=4, ensure_ascii=False))
             os.utime(path, (last_modified, last_modified))
 
+    def get_aweme_list_url(self, max_cursor):
+        aweme_list_api = "https://www.iesdouyin.com/web/api/v2/aweme/post/?"
+        params = {
+            "sec_uid": self.sec_uid,
+            "count": 21,
+            "max_cursor": max_cursor,
+            "aid": 1128,
+            "_signature": "tPJ5fAAA1M.HBHMThwCZhrTyeW",
+            "dytk":"",
+        }
+        aweme_list_url = aweme_list_api + urlencode(params)
+        return aweme_list_url
+
     def get_video_url(self, video_id):
-        return "https://aweme-hl.snssdk.com/aweme/v1/play/?video_id={}&line=0&ratio=720p&watermark=1&media_type=4&vr_type=0&improve_bitrate=0&logo_name=aweme_self".format(
-            video_id)
+        video_url_api = "https://aweme-hl.snssdk.com/aweme/v1/play/?"
+        params = {
+            "video_id": video_id,
+            "line": 0,
+            "ratio": "720p",
+            "watermark": 1,
+            "media_type": 4,
+            "vr_type": 0,
+            "improve_bitrate": 0,
+            "logo_name": "aweme_self"
+        }
+        video_url = video_url_api + urlencode(params)
+        return video_url
 
     def get_last_modified(self, aweme_dict, max_cursor):
-        if "_" in aweme_dict.get("video").get("origin_cover").get("uri"):
-            last_modified = int(
-                aweme_dict.get("video").get("origin_cover").get("uri").split(
-                    "_")[1])
+        uri = aweme_dict.get("video").get("origin_cover").get("uri")
+        if "_" in uri:
+            last_modified = int(uri.split("_")[1])
         else:
             last_modified = max_cursor / 1000
         return last_modified
@@ -83,11 +109,19 @@ class MyDouyin(object):
     def get_user_id(self, aweme_dict):
         return aweme_dict.get("author").get("uid")
 
+    def get_douyin_dict(self, url):
+        try:
+            response = self.s.get(url)
+            if response.status_code == 200:
+                douyin_dict = response.json()
+                return douyin_dict
+        except self.s.ConnectionError as e:
+            print('Error', e.args)
+
     def download_douyin(self, max_cursor, isEnd=False, update_download=False):
-        url = "https://www.iesdouyin.com/web/api/v2/aweme/post/?sec_uid={}&count=21&max_cursor={}&aid=1128&_signature=-0hNCQAAm22IvkdmgWfgI.tITR".format(
-            self.sec_uid, max_cursor)
-        print(url)
-        douyin_dict = json.loads(self.s.get(url).text)
+        aweme_list_url = self.get_aweme_list_url(max_cursor)
+        print(aweme_list_url)
+        douyin_dict = self.get_douyin_dict(aweme_list_url)
         next_max_cursor = douyin_dict.get("max_cursor")
         aweme_list_dict = douyin_dict.get("aweme_list")
         for aweme_dict in aweme_list_dict:
@@ -95,15 +129,15 @@ class MyDouyin(object):
             user_id = self.get_user_id(aweme_dict)
             last_modified = self.get_last_modified(aweme_dict, next_max_cursor)
             video_url = self.get_video_url(video_id)
-            vide_name = "user_{}_{}".format(user_id, video_id)
+            video_name = "user_{}_{}".format(user_id, video_id)
             video_save_path = os.path.join(self.user_videosDir_path,
-                                           vide_name + ".mp4")
+                                           video_name + ".mp4")
             if os.path.isfile(video_save_path) is False:
                 self.download_video(video_url, video_save_path, last_modified)
-                self.download_aweme_dict(aweme_dict, vide_name, last_modified)
             else:
                 isEnd = update_download
-                print("「{}」已经存在!".format(vide_name))
+                print("「{}」已经存在!".format(video_name))
+            self.download_aweme_dict(aweme_dict, video_name, last_modified)
         if douyin_dict.get("has_more") is True and isEnd is False:
             self.download_douyin(next_max_cursor)
         else:
@@ -118,6 +152,7 @@ class MyDouyin(object):
 
 
 def read_userlist(path):
+
     data = pd.read_table(path,
                          header=None,
                          names=["nickname", "user_id", "sec_uid"],
@@ -132,7 +167,7 @@ def read_userlist(path):
 if __name__ == "__main__":
     path = os.path.join(os.getcwd(), "douyin_userlist.txt")
     userlist = read_userlist(path)
-    for item in userlist:
+    for item in userlist[0:]:
         nickname = item.get("nickname")
         user_id = item.get("user_id")
         sec_uid = item.get("sec_uid")
