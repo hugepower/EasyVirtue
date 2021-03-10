@@ -2,7 +2,7 @@
 Author: hugepower
 Date: 2021-02-25 21:23:38
 LastEditors: hugepower
-LastEditTime: 2021-02-25 21:46:51
+LastEditTime: 2021-03-10 23:21:37
 Description: 格式化文件夹的名称
 '''
 
@@ -21,7 +21,8 @@ def dir_rename(path):
     for root,dirs,files in os.walk(path):
         for dir in dirs:
             if "," in dir:
-                dst_dirname = "{},{}".format(dir.split(",")[1].split(),dir.split(",")[0])
+                a,b = dir.split(',')[:2]
+                dst_dirname = f"{b.strip()},{a}"
                 # /Volumes/SN550/照片图库/大理白族自治州, 2015年12月9日
                 src_path = os.path.join(root,dir)
                 # /Volumes/SN550/照片图库/2015年12月9日,大理白族自治州
